@@ -1,17 +1,48 @@
+import 'dart:async';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
-import 'package:flutter_application/src/pages/profile/profile_tab.dart';
-import 'package:flutter_application/src/pages/profile/settings/settings_screen.dart';
+import 'package:flutter_application/src/pages/SettingsScreen_tab.dart';
+import 'package:flutter_application/src/pages/bluetooth_tab.dart';
+import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart';
+
+import 'package:flutter_application/src/pages/sensor_tab.dart';
+import 'package:flutter_application/src/pages/profile_tab.dart';
 
 class BaseScreen extends StatefulWidget {
-  const BaseScreen({super.key});
+  final int initialIndex;
+  final BluetoothDevice? device;
+  final BluetoothConnection? connection;
+  final Stream<Uint8List>? dataStream;
+
+  const BaseScreen({
+    super.key,
+    this.initialIndex = 0,
+    this.device,
+    this.connection,
+    this.dataStream,
+  });
 
   @override
   State<BaseScreen> createState() => _BaseScreenState();
 }
 
 class _BaseScreenState extends State<BaseScreen> {
-  int currentIndex = 0;
-  final pageController = PageController();
+  late int currentIndex;
+  late PageController pageController;
+
+  @override
+  void initState() {
+    super.initState();
+    currentIndex = widget.initialIndex;
+    pageController = PageController(initialPage: currentIndex);
+  }
+
+  @override
+  void dispose() {
+    pageController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -19,14 +50,20 @@ class _BaseScreenState extends State<BaseScreen> {
       body: PageView(
         physics: const NeverScrollableScrollPhysics(),
         controller: pageController,
-        children: [
-          Container(color: Colors.red),
-          Container(color: Colors.yellow),
-          SettingsScreen(),
+        children: <Widget>[
+          //const BluetoothSimuladoPage(),
+
+          // CHAMADA CORRETA: SensorTab com S maiúsculo
+          SensorTab(
+            device: widget.device,
+            connection: widget.connection,
+            dataStream: widget.dataStream,
+          ),
+
+          const SettingsScreen(),
           const ProfileTab(),
         ],
       ),
-
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: currentIndex,
         onTap: (index) {
