@@ -7,169 +7,305 @@ class AdminTabScreen extends StatefulWidget {
   State<AdminTabScreen> createState() => _AdminTabScreenState();
 }
 
-class _AdminTabScreenState extends State<AdminTabScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _AdminTabScreenState extends State<AdminTabScreen> {
+  int selectedTab = 0;
+  String selectedAction = 'Todos';
+  String searchQuery = '';
 
-  final List<Tab> myTabs = <Tab>[
-    const Tab(text: 'Usuários'),
-    const Tab(text: 'Logs'),
+  List<Map<String, dynamic>> users = [
+    {'id': 1, 'nome': 'Admin1', 'status': 'Ativo'},
+    {'id': 2, 'nome': 'Admin2', 'status': 'Inativo'},
+    {'id': 3, 'nome': 'Admin3', 'status': 'Ativo'},
   ];
 
-  List<Map<String, dynamic>> _usuarios = [
-    {"nome": "Admin1", "status": "Ativo", "permissao": "Admin"},
-    {"nome": "Admin2", "status": "Inativo", "permissao": "Admin"},
-    {"nome": "Admin3", "status": "Ativo", "permissao": "Admin"},
-  ];
+  List<Map<String, dynamic>> logs = [];
 
-  final TextEditingController _searchController = TextEditingController();
-  List<String> _auditData = [
-    'Admin1 inseriu registro - 2025-05-22 09:00',
-    'Admin2 editou dados - 2025-05-22 09:15',
-    'Admin1 excluiu item - 2025-05-22 09:30',
-    'Admin3 inseriu relatório - 2025-05-22 10:00',
-    'Admin2 editou configuração - 2025-05-22 10:15',
-    'Admin1 excluiu arquivo - 2025-05-22 10:30',
-  ];
-  List<String> _filteredData = [];
-  String? _selectedAction;
+  void addUser(String nome, String status) {
+    final newUser = {
+      'id': DateTime.now().millisecondsSinceEpoch,
+      'nome': nome,
+      'status': status,
+    };
 
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: myTabs.length, vsync: this);
-    _filteredData = _auditData;
-    _searchController.addListener(_filterAuditData);
-  }
-
-  void _filterAuditData() {
-    final query = _searchController.text.toLowerCase();
     setState(() {
-      _filteredData = _auditData.where((item) {
-        final itemLower = item.toLowerCase();
-        final matchesQuery = query.isEmpty || itemLower.contains(query);
-        final matchesAction = _selectedAction == null ||
-            itemLower.contains(_selectedAction!.toLowerCase());
-        return matchesQuery && matchesAction;
-      }).toList();
+      users.add(newUser);
+      logs.add({
+        'id': DateTime.now().millisecondsSinceEpoch,
+        'usuario': nome,
+        'acao': 'inseriu',
+        'hora': DateTime.now().toString(),
+      });
     });
   }
 
-  void _selectAction(String? action) {
+  void editUser(int userId, String novoNome, String novoStatus) {
+    final index = users.indexWhere((u) => u['id'] == userId);
+    if (index != -1) {
+      final antigoNome = users[index]['nome'];
+      final antigoStatus = users[index]['status'];
+
+      setState(() {
+        users[index]['nome'] = novoNome;
+        users[index]['status'] = novoStatus;
+
+        logs.add({
+          'id': DateTime.now().millisecondsSinceEpoch,
+          'usuario': antigoNome,
+          'acao': 'editou',
+          'hora': DateTime.now().toString(),
+          'campo': 'nome/status',
+          'valorAntigo': 'Nome: $antigoNome, Status: $antigoStatus',
+          'valorNovo': 'Nome: $novoNome, Status: $novoStatus',
+        });
+      });
+    }
+  }
+
+  void deleteUser(int userId) {
+    final user = users.firstWhere((u) => u['id'] == userId);
     setState(() {
-      _selectedAction = action;
-      _filterAuditData();
+      users.removeWhere((u) => u['id'] == userId);
+      logs.add({
+        'id': DateTime.now().millisecondsSinceEpoch,
+        'usuario': user['nome'],
+        'acao': 'excluiu',
+        'hora': DateTime.now().toString(),
+        'campo': 'usuário',
+        'valorAntigo': user['nome'],
+        'valorNovo': 'Usuário removido',
+      });
     });
   }
 
-  @override
-  void dispose() {
-    _tabController.dispose();
-    _searchController.dispose();
-    super.dispose();
+  List<Map<String, dynamic>> getFilteredLogs() {
+    return logs.where((log) {
+      final matchesAction = selectedAction == 'Todos' || log['acao'] == selectedAction;
+      final matchesSearch = log['usuario'].toString().toLowerCase().contains(searchQuery.toLowerCase());
+      return matchesAction && matchesSearch;
+    }).toList();
   }
 
-  Widget _buildUsuariosTab() {
-    final admins = _usuarios.where((user) => user['permissao'] == 'Admin').toList();
-
-    return ListView.builder(
-      itemCount: admins.length,
-      itemBuilder: (context, index) {
-        final user = admins[index];
-        return Card(
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: ListTile(
-            leading: const Icon(Icons.person),
-            title: Text(user['nome']),
-            subtitle: Text('Status: ${user['status']}'),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildLogsTab() {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: TextField(
-            controller: _searchController,
-            decoration: const InputDecoration(
-              labelText: 'Pesquisar registros',
-              border: OutlineInputBorder(),
-              prefixIcon: Icon(Icons.search),
-            ),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0),
-          child: Wrap(
-            spacing: 8.0,
-            children: [
-              FilterChip(
-                label: const Text('Inseriu'),
-                selected: _selectedAction == 'inseriu',
-                onSelected: (selected) {
-                  _selectAction(selected ? 'inseriu' : null);
-                },
-              ),
-              FilterChip(
-                label: const Text('Editou'),
-                selected: _selectedAction == 'editou',
-                onSelected: (selected) {
-                  _selectAction(selected ? 'editou' : null);
-                },
-              ),
-              FilterChip(
-                label: const Text('Excluiu'),
-                selected: _selectedAction == 'excluiu',
-                onSelected: (selected) {
-                  _selectAction(selected ? 'excluiu' : null);
-                },
-              ),
+  void showLogDetails(Map<String, dynamic> log) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text('Detalhes da Ação'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('ID: ${log['id']}'),
+            Text('Admin: ${log['usuario']}'),
+            Text('Ação: ${log['acao']}'),
+            Text('Hora: ${log['hora']}'),
+            if (log['acao'] == 'editou') ...[
+              Text('Campo: ${log['campo']}'),
+              Text('Valor antigo: ${log['valorAntigo']}'),
+              Text('Valor novo: ${log['valorNovo']}'),
             ],
-          ),
+            if (log['acao'] == 'excluiu') Text('Item excluído: ${log['valorAntigo']}'),
+            if (log['acao'] == 'inseriu') Text('Registro inserido'),
+          ],
         ),
-        Expanded(
-          child: ListView.builder(
-            itemCount: _filteredData.length,
-            itemBuilder: (context, index) {
-              return ListTile(
-                leading: const Icon(Icons.history),
-                title: Text(_filteredData[index]),
-                onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Selecionado: ${_filteredData[index]}'),
-                    ),
-                  );
-                },
-              );
-            },
-          ),
-        ),
-      ],
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: Text('Fechar')),
+        ],
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Área do Admin'),
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: myTabs,
-          indicatorColor: Colors.white,
-        ),
-      ),
-      body: TabBarView(
-        controller: _tabController,
+      body: Column(
         children: [
-          _buildUsuariosTab(),
-          _buildLogsTab(),
+          Container(height: 4, color: Colors.blue),
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Center(
+              child: Text(
+                'Área do Admin',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
+          TabBarHeader(
+            selectedTab: selectedTab,
+            onTabChange: (index) => setState(() => selectedTab = index),
+          ),
+          Expanded(child: selectedTab == 0 ? buildUsersTab() : buildLogsTab()),
+          Container(height: 4, color: Colors.blue),
         ],
+      ),
+      floatingActionButton: selectedTab == 0
+          ? FloatingActionButton(
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (_) {
+                    final nomeController = TextEditingController();
+                    final statusController = TextEditingController();
+                    return AlertDialog(
+                      title: Text('Novo Usuário'),
+                      content: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          TextField(controller: nomeController, decoration: InputDecoration(labelText: 'Nome')),
+                          TextField(controller: statusController, decoration: InputDecoration(labelText: 'Status')),
+                        ],
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () {
+                            Navigator.pop(context);
+                            addUser(nomeController.text, statusController.text);
+                          },
+                          child: Text('Salvar'),
+                        ),
+                      ],
+                    );
+                  },
+                );
+              },
+              child: Icon(Icons.add),
+            )
+          : null,
+    );
+  }
+
+  Widget buildUsersTab() {
+    return ListView.builder(
+      itemCount: users.length,
+      itemBuilder: (_, index) {
+        final user = users[index];
+        return Card(
+          margin: EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          child: ListTile(
+            leading: Icon(Icons.person),
+            title: Text(user['nome']),
+            subtitle: Text('Status: ${user['status']}'),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: Icon(Icons.edit, color: Colors.blue),
+                  onPressed: () {
+                    final nomeController = TextEditingController(text: user['nome']);
+                    final statusController = TextEditingController(text: user['status']);
+                    showDialog(
+                      context: context,
+                      builder: (_) => AlertDialog(
+                        title: Text('Editar Usuário'),
+                        content: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            TextField(controller: nomeController, decoration: InputDecoration(labelText: 'Nome')),
+                            TextField(controller: statusController, decoration: InputDecoration(labelText: 'Status')),
+                          ],
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              editUser(user['id'], nomeController.text, statusController.text);
+                            },
+                            child: Text('Salvar'),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+                IconButton(
+                  icon: Icon(Icons.delete, color: Colors.red),
+                  onPressed: () => deleteUser(user['id']),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget buildLogsTab() {
+    final filteredLogs = getFilteredLogs();
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: Column(
+        children: [
+          TextField(
+            decoration: InputDecoration(
+              hintText: 'Pesquisar registros',
+              prefixIcon: Icon(Icons.search),
+              border: OutlineInputBorder(),
+            ),
+            onChanged: (value) => setState(() => searchQuery = value),
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: ['Todos', 'inseriu', 'editou', 'excluiu'].map((action) {
+              return ElevatedButton(
+                onPressed: () => setState(() => selectedAction = action),
+                child: Text(action),
+              );
+            }).toList(),
+          ),
+          Expanded(
+            child: ListView.builder(
+              itemCount: filteredLogs.length,
+              itemBuilder: (_, index) {
+                final log = filteredLogs[index];
+                return ListTile(
+                  leading: Icon(Icons.history),
+                  title: Text(
+                    '${log['usuario']} ${log['acao']} - ${log['hora'].toString().substring(0, 16)}',
+                  ),
+                  onTap: () => showLogDetails(log),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class TabBarHeader extends StatelessWidget {
+  final int selectedTab;
+  final Function(int) onTabChange;
+
+  const TabBarHeader({required this.selectedTab, required this.onTabChange});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(children: [buildTab('Usuários', 0), buildTab('Logs', 1)]);
+  }
+
+  Widget buildTab(String label, int index) {
+    final isSelected = selectedTab == index;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => onTabChange(index),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(
+                color: isSelected ? Colors.blue : Colors.grey,
+                width: 2,
+              ),
+            ),
+          ),
+          child: Center(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
